@@ -343,7 +343,7 @@ with st.sidebar:
             "4. Revisa los montos y las rutas faltantes.\n"
             "5. Descarga los archivos a tu computadora."
         )
-    st.caption("Queries de Power Query pegados tal cual · Los archivos se generan en memoria, nada se guarda en el servidor")
+    st.caption("PAD")
 
 # ==========================================================
 # ENCABEZADO
@@ -682,5 +682,4 @@ with tab_cartera:
 # ==========================================================
 # PIE DE PÁGINA
 # ==========================================================
-st.caption("Los queries SQL son los mismos de Power Query, pegados tal cual. "
-           "Los archivos se generan en memoria y se descargan en la computadora de quien usa la página.")
+st.caption("PAD")
