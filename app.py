@@ -24,7 +24,10 @@ HOY = datetime.now(TZ).date()
 AYER = HOY - timedelta(days=1)
 BASE = Path(__file__).parent
 RUTA_TIPO_CAMBIO_REPO = BASE / "TIPO DE CAMBIO.xlsx"
-RUTA_VENTA_CARTERA_REPO = BASE / "Venta Cartera.xlsx"
+# Acepta .xlsb (binario: pesa menos y sí pasa el límite de GitHub) o .xlsx
+RUTA_VENTA_CARTERA_REPO = next(
+    (p for p in (BASE / "Venta Cartera.xlsb", BASE / "Venta Cartera.xlsx") if p.exists()), None
+)
 
 XLSX_MIME = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
 
@@ -274,9 +277,10 @@ with st.sidebar:
         filas.append(_fila_fuente("Tipo de cambio", True, f"{n_tc} países · repositorio"))
     except Exception:
         filas.append(_fila_fuente("Tipo de cambio", False, "falta TIPO DE CAMBIO.xlsx"))
-    if RUTA_VENTA_CARTERA_REPO.exists():
+    if RUTA_VENTA_CARTERA_REPO is not None:
         mb = RUTA_VENTA_CARTERA_REPO.stat().st_size / 1_048_576
-        filas.append(_fila_fuente("Venta de Cartera", True, f"en repositorio · {mb:.1f} MB"))
+        formato = RUTA_VENTA_CARTERA_REPO.suffix.upper().lstrip(".")
+        filas.append(_fila_fuente("Venta de Cartera", True, f"{formato} en repositorio · {mb:.1f} MB"))
     else:
         filas.append(_fila_fuente("Venta de Cartera", False, "no está en el repositorio (súbelo en Cartera)"))
     filas.append(_fila_fuente("Bases de datos", True, "10 LATAM · 7 MX vía MySQL"))
@@ -554,13 +558,13 @@ with tab_cartera:
                 fecha_especifica_car = st.date_input("Fecha de corte", value=AYER, key="car_fecha")
 
         venta_subida = st.file_uploader(
-            "Venta Cartera.xlsx (opcional: si no subes nada, se usa el del repositorio)",
-            type=["xlsx"], key="car_venta",
+            "Venta Cartera (.xlsx o .xlsb) — opcional: si no subes nada, se usa el del repositorio",
+            type=["xlsx", "xlsb"], key="car_venta",
         )
         if venta_subida is not None:
-            fuente_venta, origen_venta = venta_subida, "archivo subido"
-        elif RUTA_VENTA_CARTERA_REPO.exists():
-            fuente_venta, origen_venta = str(RUTA_VENTA_CARTERA_REPO), "repositorio"
+            fuente_venta, origen_venta = venta_subida, f"archivo subido ({venta_subida.name})"
+        elif RUTA_VENTA_CARTERA_REPO is not None:
+            fuente_venta, origen_venta = str(RUTA_VENTA_CARTERA_REPO), f"repositorio ({RUTA_VENTA_CARTERA_REPO.name})"
         else:
             fuente_venta, origen_venta = None, "no disponible"
 

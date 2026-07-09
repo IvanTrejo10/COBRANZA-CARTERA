@@ -50,6 +50,17 @@ def cargar_tipo_cambio(fuente):
     return df
 
 
+def leer_venta_cartera(fuente, hoja):
+    """Lee Venta Cartera tomando solo Llave y Concepto. Acepta .xlsx o .xlsb
+    (el binario pesa menos para GitHub y se lee con el motor pyxlsb), y puede ser
+    ruta del repositorio o archivo subido (se re-lee desde el inicio cada vez)."""
+    nombre = str(getattr(fuente, "name", fuente))
+    engine = "pyxlsb" if nombre.lower().endswith(".xlsb") else None
+    if hasattr(fuente, "getvalue"):
+        fuente = io.BytesIO(fuente.getvalue())
+    return pd.read_excel(fuente, sheet_name=hoja, usecols=["Llave", "Concepto"], engine=engine)
+
+
 # ==========================================================
 # COBRANZA LATAM (mismos pasos del Power Query / script local)
 # ==========================================================
@@ -341,7 +352,7 @@ def proceso_cartera_latam(fecha, venta_cartera=None, usuario=None, contrasena=No
             df["id_desembolso_str"] = df["id_desembolso"].fillna(0).astype(int).astype(str)
             df["Llaveventa"] = df["PAIS"].astype(str) + df["MARCA"].astype(str) + df["id_desembolso_str"]
             df = df.drop(columns=["id_desembolso_str"])
-            df_venta = pd.read_excel(venta_cartera, sheet_name="LATAM", usecols=["Llave", "Concepto"])
+            df_venta = leer_venta_cartera(venta_cartera, "LATAM")
             df_venta["Llave"] = df_venta["Llave"].astype(str)
             df = df.merge(df_venta, left_on="Llaveventa", right_on="Llave", how="left")
             antes = len(df)
@@ -417,7 +428,7 @@ def proceso_cartera_mexico(fecha, venta_cartera=None, usuario=None, contrasena=N
             df["id_desembolso_str"] = df["id_desembolso"].fillna(0).astype(int).astype(str)
             df["LlaveVenta"] = df["Marca"].astype(str) + df["id_desembolso_str"]
             df = df.drop(columns=["id_desembolso_str"])
-            df_venta = pd.read_excel(venta_cartera, sheet_name="Venta de Cartera", usecols=["Llave", "Concepto"])
+            df_venta = leer_venta_cartera(venta_cartera, "Venta de Cartera")
             df_venta["Llave"] = df_venta["Llave"].astype(str)
             df = df.merge(df_venta, left_on="LlaveVenta", right_on="Llave", how="left")
             antes = len(df)

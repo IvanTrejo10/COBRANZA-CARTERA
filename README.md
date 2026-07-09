@@ -17,7 +17,7 @@ Los queries SQL son los mismos de Power Query, pegados tal cual (módulos `datos
 | `datos_cobranza_presico.py` | Los 7 queries de cobranza PRESICO MX tal cual + columnas. |
 | `datos_cartera.py` | Servidores y columnas de cartera. |
 | `TIPO DE CAMBIO.xlsx` | Tipo de cambio por país (se puede subir otro desde la página). |
-| `Venta Cartera.xlsx` | Exclusiones de venta/inseguridad (se puede subir otro desde la página). |
+| `Venta Cartera.xlsb` | Exclusiones de venta/inseguridad en formato binario, que pesa menos y pasa el límite de 25 MB de la carga web de GitHub (también se puede subir un .xlsx/.xlsb desde la página). |
 | `.streamlit/config.toml` | Tema visual de la página (colores corporativos). |
 | `requirements.txt` | Librerías que instala Streamlit Cloud. |
 

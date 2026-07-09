@@ -6,3 +6,4 @@ PyMySQL
 openpyxl
 XlsxWriter
 pyarrow
+pyxlsb
