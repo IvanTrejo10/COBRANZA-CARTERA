@@ -1,9 +1,11 @@
-streamlit
-pandas
-numpy
-SQLAlchemy
-PyMySQL
-openpyxl
-XlsxWriter
-pyarrow
-pyxlsb
+# Versiones fijas, probadas en conjunto con Python 3.12
+# (al desplegar en share.streamlit.io elegir Python 3.12 en Advanced settings)
+streamlit==1.45.1
+pandas==2.2.3
+numpy==1.26.4
+SQLAlchemy==2.0.36
+PyMySQL==1.1.1
+openpyxl==3.1.5
+XlsxWriter==3.2.0
+pyarrow==17.0.0
+pyxlsb==1.0.10

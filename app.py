@@ -39,10 +39,17 @@ st.markdown("""
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500;700&display=swap');
 
 [data-testid="stAppViewContainer"] * { font-family: 'Inter', 'Segoe UI', sans-serif; }
-/* Restaurar la fuente de los ICONOS de Streamlit (si no, se ven como texto) */
-span[data-testid="stIconMaterial"], [data-testid="stExpanderToggleIcon"], [class*="material-symbols"] {
+/* Restaurar la fuente de los ICONOS de Streamlit (si no, se ven como texto tipo "check") */
+span[translate="no"],
+span[data-testid="stIconMaterial"],
+[data-testid="stExpanderToggleIcon"],
+[data-testid="stExpanderIcon"],
+[data-testid="stIcon"],
+[class*="material-symbols"] {
     font-family: 'Material Symbols Rounded' !important;
     font-weight: 400 !important;
+    font-style: normal !important;
+    letter-spacing: normal !important;
 }
 #MainMenu, footer { visibility: hidden; height: 0; }
 .block-container { padding-top: 1.2rem; padding-bottom: 3rem; max-width: 1350px; }
@@ -249,7 +256,7 @@ with st.sidebar:
         '<div class="sb-logo">📊</div>'
         '<div><div class="sb-title">Centro de Reportes</div>'
         '<div class="sb-sub">Cobranza · Cartera · LATAM &amp; MX</div></div>'
-        '<span class="sb-pill">v2.1</span>'
+        '<span class="sb-pill">v2.2</span>'
         '</div>',
         unsafe_allow_html=True,
     )
@@ -343,7 +350,7 @@ with st.sidebar:
             "4. Revisa los montos y las rutas faltantes.\n"
             "5. Descarga los archivos a tu computadora."
         )
-    st.caption("PAD")
+    st.caption("Queries de Power Query pegados tal cual · Los archivos se generan en memoria, nada se guarda en el servidor")
 
 # ==========================================================
 # ENCABEZADO
@@ -682,4 +689,5 @@ with tab_cartera:
 # ==========================================================
 # PIE DE PÁGINA
 # ==========================================================
-st.caption("PAD")
+st.caption("Los queries SQL son los mismos de Power Query, pegados tal cual. "
+           "Los archivos se generan en memoria y se descargan en la computadora de quien usa la página.")

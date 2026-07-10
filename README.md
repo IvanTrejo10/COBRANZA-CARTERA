@@ -25,7 +25,7 @@ Los queries SQL son los mismos de Power Query, pegados tal cual (módulos `datos
 
 1. Crea un repositorio en GitHub (recomendado **privado**) y sube TODOS los archivos de esta carpeta.
 2. Entra a https://share.streamlit.io/ con tu cuenta de GitHub → **New app**.
-3. Elige el repositorio, rama `main` y como archivo principal **`app.py`** → **Deploy**.
+3. Elige el repositorio, rama `main` y como archivo principal **`app.py`**. Abre **Advanced settings** y selecciona **Python 3.12** (importante: con Python más nuevo las librerías truenan con Segmentation fault) → **Deploy**.
 4. (Recomendado) En la app → **Settings → Secrets**, agrega las credenciales para no dejarlas en el código:
    ```toml
    DB_USER = "jtrejol"
