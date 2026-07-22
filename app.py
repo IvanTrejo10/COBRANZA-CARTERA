@@ -343,6 +343,13 @@ with st.sidebar:
                 actividad.append(("🗓️", f"Base Días {it['marca']}",
                                   f"corte {res_bd['fecha']} · {it['registros']:,} registros",
                                   res_bd.get("hora", "")))
+    res_nav = st.session_state.get("resultado_navegador")
+    if res_nav:
+        for r in res_nav["resumen"]:
+            if str(r.get("Estado", "")).startswith("✅"):
+                actividad.append(("🌐", f"Navegador {r['Marca']}",
+                                  f"corte {res_nav['fecha']} · archivo movido a OneDrive",
+                                  res_nav.get("hora", "")))
     if actividad:
         filas_act = "".join(
             f'<div class="act-row"><span class="act-emoji">{e}</span>'
@@ -801,6 +808,58 @@ with tab_basedias:
                         col.metric(nombre_kpi, dinero(valor))
                 with st.expander("👀 Vista previa (primeras 30 filas)"):
                     st.dataframe(item["muestra"], use_container_width=True, hide_index=True)
+
+    # ---------- Descarga por navegador (el proceso de movimiento) ----------
+    st.markdown("### 🌐 Descarga por navegador (las páginas)")
+    with st.container(border=True):
+        st.caption("Es el **proceso de movimiento**: abre Chrome, entra a las páginas (Rapivale, Vale Amigo, "
+                   "Vale Amigo Perú y Viva Vale), descarga la cartera base días de **HOY** —lo único que "
+                   "permiten las páginas— y mueve cada archivo de Descargas a su carpeta en OneDrive "
+                   "(Base dias). El navegador se abre en la computadora donde corre esta página, así que "
+                   "funciona al correrla local (`streamlit run app.py`); en Streamlit Cloud usa el proceso "
+                   "por base de datos de arriba.")
+        MARCAS_NAV = ["RAPIVALE", "VALE AMIGO", "VALE AMIGO PERU", "VIVA VALE"]
+        cols_nav = st.columns(len(MARCAS_NAV))
+        marcas_nav = []
+        for col, m in zip(cols_nav, MARCAS_NAV):
+            with col:
+                if st.checkbox(m, value=True, key=f"nav_{m}"):
+                    marcas_nav.append(m)
+        st.info(f"El navegador descargará el corte de **HOY ({HOY.strftime('%d-%m-%Y')})** para: "
+                f"**{', '.join(marcas_nav) or 'ninguna marca'}** y moverá los archivos a sus carpetas.")
+        correr_nav = st.button("🌐 Iniciar descarga por navegador", type="primary",
+                               disabled=not marcas_nav, key="btn_navegador")
+
+    if correr_nav:
+        try:
+            import basedias_navegador as bn
+        except Exception as e:
+            st.error("Aquí no se pudo cargar el proceso del navegador "
+                     f"(`{e}`). Este proceso necesita que la página corra **en tu computadora** con "
+                     "`pip install selenium webdriver-manager`. En Streamlit Cloud no hay navegador: "
+                     "ahí usa el proceso por base de datos, o corre `python basedias_navegador.py` local.")
+        else:
+            with st.status("🌐 NAVEGADOR — descargando de las páginas...", expanded=True) as s:
+                try:
+                    resumen_nav = bn.proceso_navegador(marcas_nav, log=st.write)
+                    ok_nav = [r for r in resumen_nav if str(r.get("Estado", "")).startswith("✅")]
+                    s.update(label=f"🌐 NAVEGADOR — {len(ok_nav)}/{len(resumen_nav)} marcas descargadas y movidas",
+                             state="complete" if ok_nav else "error", expanded=False)
+                    st.session_state["resultado_navegador"] = {
+                        "fecha": HOY.strftime("%Y-%m-%d"), "resumen": resumen_nav,
+                        "hora": datetime.now(TZ).strftime("%H:%M"),
+                    }
+                except Exception as e:
+                    s.update(label="🌐 NAVEGADOR — ❌ error", state="error")
+                    st.error(f"El navegador no pudo completar el proceso: {e}")
+
+    if "resultado_navegador" in st.session_state:
+        rn = st.session_state["resultado_navegador"]
+        with st.container(border=True):
+            st.markdown(f'<p class="card-title">🌐 Navegador — corte {rn["fecha"]}</p>'
+                        f'<p class="card-sub">Los archivos quedaron en sus carpetas de OneDrive (Base dias)</p>',
+                        unsafe_allow_html=True)
+            mostrar_conteos(rn["resumen"])
 
     # ---------- Comparativo de archivos ----------
     st.markdown("### 🧮 Comparativo de archivos")

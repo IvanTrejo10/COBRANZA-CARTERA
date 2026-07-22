@@ -19,7 +19,7 @@ Los queries SQL son los mismos de Power Query, pegados tal cual (módulos `datos
 | `datos_cartera.py` | Servidores y columnas de cartera. |
 | `datos_basedias.py` | Servidores y queries de BASE DÍAS (NV Vale/Viva Vale y RP Vale) con la fecha parametrizada. **Aquí se llenan los campos `PENDIENTE_` de Viva Vale y RP Vale.** |
 | `procesos_basedias.py` | Motor de BASE DÍAS: extracción por base de datos + comparativo de archivos. |
-| `basedias_navegador.py` | Proceso por PÁGINA (Selenium): descarga de las 4 webs y mueve los archivos a OneDrive. Se corre local: `pip install selenium webdriver-manager` y `python basedias_navegador.py`. |
+| `basedias_navegador.py` | Proceso por PÁGINA (Selenium): descarga de las 4 webs y mueve los archivos a OneDrive. Se corre desde la pestaña BASE DÍAS (con la página corriendo local) o solo: `pip install selenium webdriver-manager` y `python basedias_navegador.py`. |
 | `test_basedias.py` | Pruebas del comparativo (se corren con `python test_basedias.py`). |
 | `TIPO DE CAMBIO.xlsx` | Tipo de cambio por país (se puede subir otro desde la página). |
 | `Venta Cartera.xlsb` | Exclusiones de venta/inseguridad en formato binario, que pesa menos y pasa el límite de 25 MB de la carga web de GitHub (también se puede subir un .xlsx/.xlsb desde la página). |
