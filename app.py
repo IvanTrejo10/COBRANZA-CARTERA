@@ -12,6 +12,8 @@ import pandas as pd
 import streamlit as st
 
 import procesos as pr
+import procesos_basedias as pb
+import datos_basedias as dbd
 
 # ==========================================================
 # CONFIGURACIÓN GENERAL
@@ -256,7 +258,7 @@ with st.sidebar:
         '<div class="sb-logo">📊</div>'
         '<div><div class="sb-title">Centro de Reportes</div>'
         '<div class="sb-sub">Cobranza · Cartera · LATAM &amp; MX</div></div>'
-        '<span class="sb-pill">v2.2</span>'
+        '<span class="sb-pill">v2.3</span>'
         '</div>',
         unsafe_allow_html=True,
     )
@@ -291,6 +293,11 @@ with st.sidebar:
     else:
         filas.append(_fila_fuente("Venta de Cartera", False, "no está en el repositorio (súbelo en Cartera)"))
     filas.append(_fila_fuente("Bases de datos", True, "10 LATAM · 7 MX vía MySQL"))
+    _bd_ok = [s for s in dbd.SERVIDORES_BASE_DIAS if pb.servidor_configurado(s)]
+    filas.append(_fila_fuente(
+        "Base Días", len(_bd_ok) == len(dbd.SERVIDORES_BASE_DIAS),
+        f"{len(_bd_ok)}/{len(dbd.SERVIDORES_BASE_DIAS)} marcas con servidor configurado",
+    ))
     st.markdown(f'<div class="sb-card">{"".join(filas)}</div>', unsafe_allow_html=True)
 
     if st.button("🔄 Refrescar catálogos", use_container_width=True,
@@ -329,6 +336,13 @@ with st.sidebar:
                 actividad.append(("📦", f"Cartera {b['region']}",
                                   f"corte {res_car['fecha']} · {b['registros']:,} registros",
                                   res_car.get("hora", "")))
+    res_bd = st.session_state.get("resultado_basedias")
+    if res_bd:
+        for it in res_bd["items"]:
+            if not it.get("error"):
+                actividad.append(("🗓️", f"Base Días {it['marca']}",
+                                  f"corte {res_bd['fecha']} · {it['registros']:,} registros",
+                                  res_bd.get("hora", "")))
     if actividad:
         filas_act = "".join(
             f'<div class="act-row"><span class="act-emoji">{e}</span>'
@@ -370,7 +384,7 @@ st.markdown(
     """, unsafe_allow_html=True,
 )
 
-tab_cobranza, tab_cartera = st.tabs(["💰  COBRANZA", "📦  CARTERA"])
+tab_cobranza, tab_cartera, tab_basedias = st.tabs(["💰  COBRANZA", "📦  CARTERA", "🗓️  BASE DÍAS"])
 
 # ==========================================================
 # APARTADO 1: COBRANZA
@@ -685,6 +699,196 @@ with tab_cartera:
                             st.info(aviso)
                     else:
                         st.caption("Sin avisos.")
+
+# ==========================================================
+# APARTADO 3: BASE DÍAS (extracción por base de datos + comparativo)
+# ==========================================================
+with tab_basedias:
+    with st.container(border=True):
+        st.markdown("#### ⚙️ Configuración del proceso")
+        col1, col2 = st.columns([2.2, 1])
+        with col1:
+            modo_bd = st.radio(
+                "Fecha de corte",
+                [f"📆 Hoy ({HOY.strftime('%d-%m-%Y')})", "📅 Fecha específica"],
+                horizontal=True, key="bd_modo",
+            )
+        with col2:
+            fecha_especifica_bd = None
+            if modo_bd.startswith("📅"):
+                fecha_especifica_bd = st.date_input("Fecha de corte", value=HOY, key="bd_fecha")
+        fecha_bd = (fecha_especifica_bd if modo_bd.startswith("📅") and fecha_especifica_bd else HOY).strftime("%Y-%m-%d")
+
+        cols_marcas = st.columns(len(dbd.SERVIDORES_BASE_DIAS))
+        marcas_elegidas = []
+        for col, srv in zip(cols_marcas, dbd.SERVIDORES_BASE_DIAS):
+            configurado = pb.servidor_configurado(srv)
+            with col:
+                etiqueta = srv["nombre"] if configurado else f"{srv['nombre']} ⚠️"
+                marcado = st.checkbox(etiqueta, value=configurado, key=f"bd_{srv['nombre']}",
+                                      help=None if configurado
+                                      else "Falta poner el servidor en datos_basedias.py (campos PENDIENTE)")
+                if marcado:
+                    marcas_elegidas.append(srv["nombre"])
+
+        st.info(f"Se descargará la **cartera base días** con corte **{fecha_bd}** directo de la base de datos "
+                f"para: **{', '.join(marcas_elegidas) or 'ninguna marca'}**. "
+                "El proceso por página (navegador) sigue disponible con `basedias_navegador.py` en tu computadora.")
+        generar_bd = st.button("🚀 Generar base días", type="primary",
+                               disabled=not marcas_elegidas, key="btn_basedias")
+
+    if generar_bd:
+        usuario, contrasena = credenciales()
+        items = []
+        with st.status(f"🗓️ BASE DÍAS — corte {fecha_bd}", expanded=True) as s:
+            barra = st.progress(0.0)
+            resultados, conteos = pb.proceso_base_dias(
+                fecha_bd, marcas_elegidas, usuario, contrasena,
+                log=st.write, avance=barra.progress,
+            )
+            for marca in marcas_elegidas:
+                df_m = resultados.get(marca)
+                estado = next((c for c in conteos if c["Base"] == marca), {})
+                if df_m is None:
+                    items.append({"marca": marca, "error": estado.get("Estado", "Sin datos"), "conteos": conteos})
+                    continue
+                nombre = pb.nombre_archivo(marca, fecha_bd)
+                items.append({
+                    "marca": marca, "registros": len(df_m), "conteos": conteos,
+                    "kpis": pb.kpis_base_dias(df_m), "muestra": df_m.head(30),
+                    "archivo_csv": f"{nombre}.csv", "csv": pb.csv_bytes(df_m),
+                    "archivo_xlsx": f"{nombre}.xlsx", "excel": pr.excel_bytes(df_m),
+                    "df": df_m,
+                })
+            hubo_datos = any("registros" in it for it in items)
+            s.update(label=f"🗓️ BASE DÍAS {fecha_bd} — "
+                           + ("✅ terminado" if hubo_datos else "❌ sin datos"),
+                     state="complete" if hubo_datos else "error", expanded=False)
+        st.session_state["resultado_basedias"] = {"fecha": fecha_bd, "items": items,
+                                                  "hora": datetime.now(TZ).strftime("%H:%M")}
+
+    # ---------- Resultados de base días ----------
+    if "resultado_basedias" in st.session_state:
+        res = st.session_state["resultado_basedias"]
+        st.markdown(f"### 📈 Resultados — corte {res['fecha']}")
+        for item in res["items"]:
+            with st.container(border=True):
+                if item.get("error"):
+                    st.markdown(f'<p class="card-title">🗓️ Base Días {item["marca"]}</p>', unsafe_allow_html=True)
+                    st.error(item["error"])
+                    continue
+                c1, c2, c3 = st.columns([2.4, 1.0, 1.9])
+                with c1:
+                    st.markdown(
+                        f'<p class="card-title">🗓️ Base Días {item["marca"]}</p>'
+                        f'<p class="card-sub">Fecha de corte: {res["fecha"]} · directo de base de datos</p>',
+                        unsafe_allow_html=True,
+                    )
+                with c2:
+                    st.metric("Registros", f"{item['registros']:,}")
+                with c3:
+                    st.download_button(f"⬇️ {item['archivo_csv']}", data=item["csv"],
+                                       file_name=item["archivo_csv"], mime="text/csv",
+                                       key=f"dl_bd_csv_{item['marca']}_{res['fecha']}",
+                                       type="primary", use_container_width=True)
+                    st.download_button(f"⬇️ {item['archivo_xlsx']}", data=item["excel"],
+                                       file_name=item["archivo_xlsx"], mime=XLSX_MIME,
+                                       key=f"dl_bd_xlsx_{item['marca']}_{res['fecha']}",
+                                       use_container_width=True)
+                if item.get("kpis"):
+                    cols_kpi = st.columns(max(len(item["kpis"]), 1))
+                    for col, (nombre_kpi, valor) in zip(cols_kpi, item["kpis"].items()):
+                        col.metric(nombre_kpi, dinero(valor))
+                with st.expander("👀 Vista previa (primeras 30 filas)"):
+                    st.dataframe(item["muestra"], use_container_width=True, hide_index=True)
+
+    # ---------- Comparativo de archivos ----------
+    st.markdown("### 🧮 Comparativo de archivos")
+    with st.container(border=True):
+        st.caption("Valida que dos archivos tengan los **mismos registros** y que **cada registro tenga la misma "
+                   "información** (por ejemplo: el descargado de la página vs el generado por base de datos). "
+                   "Cualquier diferencia se enlista y se puede descargar en Excel.")
+        colA, colB = st.columns(2)
+        with colA:
+            archivo_a = st.file_uploader("Archivo 1 (ej. descargado de la página)",
+                                         type=["csv", "xlsx", "xls", "xlsb"], key="cmp_a")
+        with colB:
+            usar_generado = False
+            res_bd_cmp = st.session_state.get("resultado_basedias")
+            marcas_generadas = [it["marca"] for it in res_bd_cmp["items"] if "df" in it] if res_bd_cmp else []
+            if marcas_generadas:
+                origen_b = st.radio("Archivo 2", ["📄 Subir archivo", "⚙️ Usar resultado recién generado"],
+                                    horizontal=True, key="cmp_origen_b")
+                usar_generado = origen_b.startswith("⚙️")
+            if usar_generado:
+                marca_b = st.selectbox("Marca generada", marcas_generadas, key="cmp_marca_b")
+                archivo_b = None
+            else:
+                archivo_b = st.file_uploader("Archivo 2 (ej. generado por base de datos)",
+                                             type=["csv", "xlsx", "xls", "xlsb"], key="cmp_b")
+
+        col_l1, col_l2 = st.columns([1.4, 1])
+        with col_l1:
+            llave_texto = st.text_input("Columna llave (opcional: si se deja vacío, se detecta sola — Numero / ID Socio)",
+                                        key="cmp_llave")
+        with col_l2:
+            tolerancia = st.number_input("Tolerancia en montos", value=0.01, min_value=0.0, step=0.01,
+                                         help="Diferencia máxima para considerar iguales dos cantidades", key="cmp_tol")
+
+        listo_b = usar_generado or archivo_b is not None
+        comparar = st.button("🔍 Comparar", type="primary", disabled=not (archivo_a and listo_b), key="btn_comparar")
+
+    if comparar:
+        try:
+            df_a = pb.leer_archivo_tabla(archivo_a)
+            if usar_generado:
+                item_b = next(it for it in res_bd_cmp["items"] if it.get("marca") == marca_b)
+                df_b, etiqueta_b = item_b["df"], f"Base de datos {marca_b}"
+            else:
+                df_b, etiqueta_b = pb.leer_archivo_tabla(archivo_b), f"Archivo 2 ({archivo_b.name})"
+            resultado = pb.comparar_tablas(
+                df_a, df_b, etiqueta_a=f"Archivo 1 ({archivo_a.name})", etiqueta_b=etiqueta_b,
+                llave=llave_texto.strip() or None, tolerancia=tolerancia,
+            )
+            st.session_state["resultado_comparativo"] = resultado
+        except Exception as e:
+            st.error(f"No se pudo comparar: {e}")
+
+    if "resultado_comparativo" in st.session_state:
+        rc = st.session_state["resultado_comparativo"]
+        et_a, et_b = rc["etiquetas"]
+        if rc["identicos"]:
+            st.success("✅ **Los archivos son idénticos**: mismos registros y cada registro con la misma información.")
+        else:
+            st.error("❌ **Se detectaron diferencias** — el detalle viene abajo y en el reporte de Excel.")
+        m1, m2, m3, m4, m5 = st.columns(5)
+        m1.metric(et_a.split(" (")[0] + " 1", f"{rc['resumen'][f'Registros {et_a}']:,}")
+        m2.metric(et_b.split(" (")[0] + " 2", f"{rc['resumen'][f'Registros {et_b}']:,}")
+        m3.metric("Solo en 1", f"{rc['resumen'][f'Solo en {et_a}']:,}")
+        m4.metric("Solo en 2", f"{rc['resumen'][f'Solo en {et_b}']:,}")
+        m5.metric("Celdas diferentes", f"{rc['resumen']['Celdas con diferencia']:,}")
+        st.caption(f"Llave usada: **{rc['llave_usada']}** · Columnas comparadas: {rc['resumen']['Columnas comparadas']}")
+        for aviso in rc["avisos"]:
+            st.info(aviso)
+        if rc["columnas_solo_a"]:
+            st.warning(f"Columnas que solo están en {et_a}: {', '.join(rc['columnas_solo_a'])}")
+        if rc["columnas_solo_b"]:
+            st.warning(f"Columnas que solo están en {et_b}: {', '.join(rc['columnas_solo_b'])}")
+
+        if not rc["diferencias"].empty:
+            with st.expander(f"📋 Diferencias campo por campo ({len(rc['diferencias']):,})", expanded=True):
+                st.dataframe(rc["diferencias"], use_container_width=True, hide_index=True, height=320)
+        if not rc["solo_a"].empty:
+            with st.expander(f"➖ Registros solo en {et_a} ({len(rc['solo_a']):,})"):
+                st.dataframe(rc["solo_a"], use_container_width=True, hide_index=True, height=260)
+        if not rc["solo_b"].empty:
+            with st.expander(f"➕ Registros solo en {et_b} ({len(rc['solo_b']):,})"):
+                st.dataframe(rc["solo_b"], use_container_width=True, hide_index=True, height=260)
+
+        st.download_button("⬇️ Descargar reporte del comparativo (Excel)",
+                           data=pb.reporte_comparativo_bytes(rc),
+                           file_name="Comparativo Base Dias.xlsx", mime=XLSX_MIME,
+                           key="dl_comparativo", type="primary")
 
 # ==========================================================
 # PIE DE PÁGINA
