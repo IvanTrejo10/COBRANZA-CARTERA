@@ -7,6 +7,9 @@ cambió es la fecha de corte para poder elegir el día (igual que en cobranza):
     (antes de ejecutar el query se corre `SET @FechaCorte = 'AAAA-MM-DD'`).
   - Query RP (SQL Server): `DECLARE @currentDate DATETIME = GETDATE();`
     -> `DECLARE @currentDate DATETIME = '__FECHA__';` (se sustituye la fecha elegida).
+Además, TODOS los formatos de fecha de los queries se emiten como
+AAAA-MM-DD, que es el mismo formato de los archivos que descarga el
+sistema (para que el comparativo cuadre sin falsas diferencias).
 """
 
 # ------------------------------------------------------------------
@@ -61,7 +64,7 @@ SELECT
     cr.name AS 'Region',
     cb.name AS 'Sucursal',
     
-    DATE_FORMAT(cc_closure.date, '%d/%m/%Y') AS 'Fecha de Corte',
+    DATE_FORMAT(cc_closure.date, '%Y-%m-%d') AS 'Fecha de Corte',
     
     CAST(cd.number AS SIGNED) AS 'Numero',
     CONCAT_WS(' ', cpn.name, cpn.middle_name, cpn.last_name, cpn.second_last_name) AS 'Nombre',
@@ -98,16 +101,16 @@ SELECT
         WHEN IFNULL(cce.total_thrift_amount, 0) > 0 OR cce.thrift_activation_date IS NOT NULL THEN 'SI' 
         ELSE 'NO' 
     END AS 'Ahorro Amigo',
-    IFNULL(DATE_FORMAT(cce.thrift_activation_date, '%d/%m/%Y'), '') AS 'Fecha Activacion Ahorro Amigo',
+    IFNULL(DATE_FORMAT(cce.thrift_activation_date, '%Y-%m-%d'), '') AS 'Fecha Activacion Ahorro Amigo',
     IFNULL(cce.total_thrift_amount, 0.00) AS 'Total Ahorro Amigo',
     
-    IFNULL(DATE_FORMAT(cce.activation_date, '%d/%m/%Y'), '') AS 'Fecha Activacion',
+    IFNULL(DATE_FORMAT(cce.activation_date, '%Y-%m-%d'), '') AS 'Fecha Activacion',
     IFNULL(DATE_FORMAT((
         SELECT MAX(cp.date) 
         FROM credit_puchases cp 
         WHERE cp.id_distributor = cd.id_distributor AND cp.status = 1
-    ), '%d/%m/%Y'), '') AS 'Fecha Ultimo Canje',
-    IFNULL(DATE_FORMAT(cce.last_payment_date, '%d/%m/%Y'), '') AS 'Fecha Ultimo Pago',
+    ), '%Y-%m-%d'), '') AS 'Fecha Ultimo Canje',
+    IFNULL(DATE_FORMAT(cce.last_payment_date, '%Y-%m-%d'), '') AS 'Fecha Ultimo Pago',
     
     -- Diccionario de Estatus Completo (Aquí ya puedes ponerle los nombres reales a los "Misterios")
     CASE
@@ -190,7 +193,7 @@ SELECT
     cr.name AS 'Region',
     cb.name AS 'Sucursal',
     
-    DATE_FORMAT(cc_closure.date, '%d/%m/%Y') AS 'Fecha de Corte',
+    DATE_FORMAT(cc_closure.date, '%Y-%m-%d') AS 'Fecha de Corte',
     
     CAST(cd.number AS SIGNED) AS 'Numero',
     CONCAT_WS(' ', cpn.name, cpn.middle_name, cpn.last_name, cpn.second_last_name) AS 'Nombre',
@@ -232,16 +235,16 @@ SELECT
         WHEN IFNULL(cce.total_thrift_amount, 0) > 0 OR cce.thrift_activation_date IS NOT NULL THEN 'SI' 
         ELSE 'NO' 
     END AS 'Ahorro Amigo',
-    IFNULL(DATE_FORMAT(cce.thrift_activation_date, '%d/%m/%Y'), '') AS 'Fecha Activacion Ahorro Amigo',
+    IFNULL(DATE_FORMAT(cce.thrift_activation_date, '%Y-%m-%d'), '') AS 'Fecha Activacion Ahorro Amigo',
     IFNULL(cce.total_thrift_amount, 0.00) AS 'Total Ahorro Amigo',
     
-    IFNULL(DATE_FORMAT(cce.activation_date, '%d/%m/%Y'), '') AS 'Fecha Activacion',
+    IFNULL(DATE_FORMAT(cce.activation_date, '%Y-%m-%d'), '') AS 'Fecha Activacion',
     IFNULL(DATE_FORMAT((
         SELECT MAX(cp.date) 
         FROM credit_puchases cp 
         WHERE cp.id_distributor = cd.id_distributor AND cp.status = 1
-    ), '%d/%m/%Y'), '') AS 'Fecha Ultimo Canje',
-    IFNULL(DATE_FORMAT(cce.last_payment_date, '%d/%m/%Y'), '') AS 'Fecha Ultimo Pago',
+    ), '%Y-%m-%d'), '') AS 'Fecha Ultimo Canje',
+    IFNULL(DATE_FORMAT(cce.last_payment_date, '%Y-%m-%d'), '') AS 'Fecha Ultimo Pago',
     
     CASE
         WHEN cce.status = 1 THEN 'Pendiente'
@@ -319,7 +322,6 @@ ORDER BY cb.name, cd.number;
 
 QUERY_RP_VALE = r"""
 DECLARE @currentDate DATETIME = '__FECHA__'; 
-
 SELECT 
     cb.name AS 'Sucursal',
     cd.id_distributor AS 'ID Socio',
@@ -364,9 +366,9 @@ SELECT
     ISNULL(cce.max_due_days, 0) AS 'Mora Máxima',
     ISNULL(cce.balance_without_discount, 0.00) AS 'Saldo sin descuento',
     
-    ISNULL(CONVERT(VARCHAR(10), cce.activation_date, 103), '') AS 'Fecha Activación',
-    ISNULL(CONVERT(VARCHAR(10), cce.last_swapped_date, 103), '') AS 'Fecha Ultimo Canje',
-    ISNULL(CONVERT(VARCHAR(10), cce.last_payment_date, 103), '') AS 'Fecha Ultimo Pago',
+    ISNULL(CONVERT(VARCHAR(10), cce.activation_date, 23), '') AS 'Fecha Activación',
+    ISNULL(CONVERT(VARCHAR(10), cce.last_swapped_date, 23), '') AS 'Fecha Ultimo Canje',
+    ISNULL(CONVERT(VARCHAR(10), cce.last_payment_date, 23), '') AS 'Fecha Ultimo Pago',
     
     CASE
         WHEN cce.status = 1 THEN 'Pendiente'
@@ -404,7 +406,6 @@ SELECT
         WHEN cce.status = 99 THEN 'Eliminado'
         ELSE 'Migrado'
     END AS 'Status'
-
 FROM [dbo].[credit_distributors] cd
 INNER JOIN [dbo].[closure_closures_entries] cce ON cd.id_distributor = cce.id_distributor
 INNER JOIN [dbo].[closure_closures] cc_closure ON cc_closure.id_closure = cce.id_closure 
@@ -412,9 +413,7 @@ INNER JOIN [dbo].[closure_closures] cc_closure ON cc_closure.id_closure = cce.id
 INNER JOIN [dbo].[core_branches] cb ON cb.id_branch = cd.id_branch
 INNER JOIN [dbo].[credit_persons] cpn ON cpn.id_person = cd.id_person
 LEFT JOIN [dbo].[collection_coordinations] coord ON coord.id_coordination = cce.id_coordination
-
-WHERE cce.status NOT IN (18, 26)
-
+WHERE cce.status NOT IN (26)
 ORDER BY cb.name, cd.id_distributor;
 """
 
@@ -459,16 +458,16 @@ SELECT
         WHEN IFNULL(cce.total_thrift_amount, 0) > 0 OR cce.thrift_activation_date IS NOT NULL THEN 'SI' 
         ELSE 'NO' 
     END AS 'Ahorro Amigo',
-    IFNULL(DATE_FORMAT(cce.thrift_activation_date, '%d/%m/%Y'), '') AS 'Fecha Activación Ahorro Amigo',
+    IFNULL(DATE_FORMAT(cce.thrift_activation_date, '%Y-%m-%d'), '') AS 'Fecha Activación Ahorro Amigo',
     IFNULL(cce.total_thrift_amount, 0.00) AS 'Total Ahorro Amigo',
     
-    IFNULL(DATE_FORMAT(cce.activation_date, '%d/%m/%Y'), '') AS 'Fecha Activación',
+    IFNULL(DATE_FORMAT(cce.activation_date, '%Y-%m-%d'), '') AS 'Fecha Activación',
     IFNULL(DATE_FORMAT((
         SELECT MAX(cp.date) 
         FROM credit_puchases cp 
         WHERE cp.id_distributor = cd.id_distributor AND cp.status = 1
-    ), '%d/%m/%Y'), '') AS 'Fecha Ultimo Canje',
-    IFNULL(DATE_FORMAT(cce.last_payment_date, '%d/%m/%Y'), '') AS 'Fecha Ultimo Pago',
+    ), '%Y-%m-%d'), '') AS 'Fecha Ultimo Canje',
+    IFNULL(DATE_FORMAT(cce.last_payment_date, '%Y-%m-%d'), '') AS 'Fecha Ultimo Pago',
     
     CASE
         WHEN cce.status = 1 THEN 'Pendiente'

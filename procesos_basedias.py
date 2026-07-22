@@ -84,6 +84,7 @@ def proceso_base_dias(fecha, marcas=None, usuario=None, contrasena=None, log=_no
         log(f"🔌 Conectando a **{s['nombre']}** ({s['host']})...")
         try:
             df = extraer_base_dias(s, fecha, usuario, contrasena)
+            df = formatear_salida_marca(df, s['nombre'])
             resultados[s['nombre']] = df
             conteos.append({"Base": s['nombre'], "Registros": len(df), "Estado": "✅ OK"})
             log(f"　　✅ {len(df):,} registros descargados")
@@ -106,10 +107,108 @@ def nombre_archivo(servidor_o_marca, fecha):
     return plantilla.format(fecha=fecha)
 
 
+# ==========================================================
+# FORMATO DE SALIDA POR MARCA — copiado de los archivos que
+# descarga el sistema (mismos encabezados, acentos y orden).
+# Las columnas que el query no trae NO se inventan; las extra
+# del query (ej. 'Fecha de Corte') se van al final.
+# ==========================================================
+_RENOMBRES_NV = {
+    'Sub Direccion': 'Sub Dirección', 'Division': 'División', 'Region': 'Región',
+    'Numero': 'Número', 'Categoria': 'Categoría',
+    'Limite de Credito': 'Límite de Crédito', 'Mora Maxima': 'Mora Máxima',
+    'Fecha Activacion Ahorro Amigo': 'Fecha Activación Ahorro Amigo',
+    'Fecha Activacion': 'Fecha Activación', 'Antiguedad': 'Antigüedad',
+    'Telefono': 'Teléfono', 'Protecciones': 'Protecciones Distribuidor',
+}
+# En México los datos de dirección salen con los encabezados del sistema MX
+_RENOMBRES_DIRECCION_MX = {'Ubigeo': 'CP', 'Provincia': 'Ciudad', 'Departamento': 'Estado'}
+
+FORMATO_SALIDA_BD = {
+    'VALE AMIGO': {
+        'renombres': {**_RENOMBRES_NV, **_RENOMBRES_DIRECCION_MX},
+        'quitar': ['Capital'],
+        'orden': ['Sub Dirección', 'División', 'Región', 'Sucursal', 'Número', 'Nombre',
+                  'Categoría', 'Coordinacion', 'Clientes con Compras Pendientes',
+                  'Total de Compras Pendientes', 'Vencido', 'Exigible', 'Vigente', 'Total',
+                  'Colocado', 'Colocado PP', 'Colocado PP Especial', 'Disponible',
+                  'Límite de Crédito', 'Mora Actual', 'Mora Máxima', 'Saldo Sin Descuento',
+                  'Ahorro Amigo', 'Fecha Activación Ahorro Amigo', 'Total Ahorro Amigo',
+                  'Fecha Activación', 'Fecha Ultimo Canje', 'Fecha Ultimo Pago', 'Status',
+                  'Antigüedad', 'Calle y #', 'Colonia', 'CP', 'Ciudad', 'Estado', 'Teléfono',
+                  'Protecciones Distribuidor', 'UNOM', 'Edad Actual', 'Competencias'],
+    },
+    'VALE AMIGO PERU': {
+        'renombres': _RENOMBRES_NV,
+        'quitar': [],
+        'orden': ['Sub Dirección', 'División', 'Región', 'Sucursal', 'Número', 'Nombre',
+                  'Categoría', 'Coordinacion', 'Clientes con Compras Pendientes',
+                  'Total de Compras Pendientes', 'Vencido', 'Exigible', 'Vigente', 'Total',
+                  'Colocado', 'Colocado PP', 'Colocado PP Especial', 'Disponible',
+                  'Límite de Crédito', 'Mora Actual', 'Mora Máxima', 'Saldo Sin Descuento',
+                  'Ahorro Amigo', 'Fecha Activación Ahorro Amigo', 'Total Ahorro Amigo',
+                  'Fecha Activación', 'Fecha Ultimo Canje', 'Fecha Ultimo Pago', 'Status',
+                  'Antigüedad', 'Calle y #', 'Capital', 'Ubigeo', 'Provincia', 'Departamento',
+                  'Teléfono', 'Protecciones Distribuidor', 'UNOM'],
+    },
+    'VIVA VALE': {
+        'renombres': {**_RENOMBRES_NV, **_RENOMBRES_DIRECCION_MX,
+                      'Fecha Ultimo Canje': 'Fecha último canje',
+                      'Fecha Ultimo Pago': 'Fecha último Pago'},
+        'quitar': ['Capital'],
+        'orden': ['Sub Dirección', 'División', 'Región', 'Sucursal', 'Número', 'Nombre',
+                  'Categoría', 'Coordinacion', 'Clientes con Compras Pendientes', 'Vencido',
+                  'Exigible', 'Vigente', 'Total', 'Colocado', 'Colocado PP',
+                  'Colocado PP Especial', 'Disponible', 'Límite de Crédito', 'Mora Actual',
+                  'Mora Máxima', 'Saldo Sin Descuento', 'Ahorro Amigo',
+                  'Fecha Activación Ahorro Amigo', 'Total Ahorro Amigo', 'Fecha Activación',
+                  'Fecha último canje', 'Status', 'Fecha último Pago',
+                  'Última cantidad abonada', 'Antigüedad', 'Calle y #', 'Colonia', 'CP',
+                  'Ciudad', 'Estado', 'Teléfono', 'Protecciones Distribuidor', 'UNOM'],
+    },
+    'RP VALE': {
+        'renombres': {},
+        'quitar': [],
+        'orden': ['Sucursal', 'ID Socio', 'Nombre', 'Periodicidad del Crédito', 'Categoría',
+                  'Coordinación', 'Total Clientes', 'Vencido', 'Exigible', 'Vigente', 'Total',
+                  'Colocado', 'Colocado PP', 'Colocado Interes PP', 'Colocado Préstamo Especial',
+                  'Colocado Rapishop', 'Colocado Rapishop Socio', 'Colocado Préstamo Reactivate',
+                  'Disponible', 'Límite de Crédito', 'Mora Actual', 'Mora Máxima',
+                  'Saldo sin descuento', 'Fecha Activación', 'Fecha Ultimo Canje',
+                  'Fecha Ultimo Pago', 'Status'],
+    },
+}
+
+# Conteos que deben salir SIN decimales (como en los archivos del sistema)
+_COLUMNAS_ENTERAS_BD = ['Número', 'Numero', 'ID Socio', 'Total Clientes', 'Mora Actual',
+                        'Mora Máxima', 'Mora Maxima', 'Antigüedad', 'Antiguedad',
+                        'Clientes con Compras Pendientes']
+
+
+def formatear_salida_marca(df, marca):
+    """Deja el DataFrame con los mismos encabezados y orden que el archivo
+    que descarga el sistema para esa marca (solo formato, no valores)."""
+    formato = FORMATO_SALIDA_BD.get(marca)
+    if not formato:
+        return df
+    df = df.rename(columns=formato['renombres'])
+    df = df.drop(columns=[c for c in formato['quitar'] if c in df.columns], errors='ignore')
+    for col in _COLUMNAS_ENTERAS_BD:
+        if col in df.columns:
+            try:
+                df[col] = pd.array([None if v is None or (isinstance(v, float) and v != v)
+                                    else int(float(v)) for v in df[col]], dtype='Int64')
+            except (TypeError, ValueError):
+                pass
+    presentes = [c for c in formato['orden'] if c in df.columns]
+    extras = [c for c in df.columns if c not in presentes]   # ej. 'Fecha de Corte' al final
+    return df[presentes + extras]
+
+
 def csv_bytes(df):
-    """CSV en memoria con BOM (utf-8-sig) para que Excel respete los acentos."""
+    """CSV en memoria con BOM (utf-8-sig) y montos a 2 decimales, como el sistema."""
     buf = io.BytesIO()
-    df.to_csv(buf, index=False, encoding='utf-8-sig')
+    df.to_csv(buf, index=False, encoding='utf-8-sig', float_format='%.2f')
     return buf.getvalue()
 
 
@@ -186,10 +285,51 @@ def _texto_norm(valor):
     return re.sub(r'\s+', ' ', txt)
 
 
+_RE_FECHA_ISO = re.compile(r'^(\d{4})-(\d{1,2})-(\d{1,2})([ T]\d{1,2}:\d{2}(:\d{2})?)?$')
+_RE_FECHA_DMA = re.compile(r'^(\d{1,2})/(\d{1,2})/(\d{4})([ T]\d{1,2}:\d{2}(:\d{2})?)?$')
+
+
+def _fecha(valor):
+    """Convierte a fecha (AAAA, MM, DD) si el valor parece fecha; None si no.
+
+    Acepta 'AAAA-MM-DD' y 'DD/MM/AAAA' (con o sin hora), datetime/Timestamp
+    y fechas de Excel — así '2023-09-02' y '02/09/2023' comparan IGUALES.
+    """
+    if valor is None:
+        return None
+    if hasattr(valor, 'year') and hasattr(valor, 'month') and hasattr(valor, 'day'):
+        try:
+            return (int(valor.year), int(valor.month), int(valor.day))
+        except (TypeError, ValueError):
+            return None
+    txt = str(valor).strip()
+    m = _RE_FECHA_ISO.match(txt)
+    if m:
+        a, mes, dia = int(m.group(1)), int(m.group(2)), int(m.group(3))
+    else:
+        m = _RE_FECHA_DMA.match(txt)
+        if not m:
+            return None
+        dia, mes, a = int(m.group(1)), int(m.group(2)), int(m.group(3))
+    if 1 <= mes <= 12 and 1 <= dia <= 31 and a >= 1900:
+        return (a, mes, dia)
+    return None
+
+
 def _valores_iguales(va, vb, tolerancia):
+    # 1) Fechas: mismo día en cualquier formato -> iguales
+    fa, fb = _fecha(va), _fecha(vb)
+    if fa is not None and fb is not None:
+        return fa == fb
+    # 2) Números: tolerancia en centavos; vacío cuenta como 0
     na, nb = _numero(va), _numero(vb)
     if na is not None and nb is not None:
         return abs(na - nb) <= tolerancia
+    if na is not None and _texto_norm(vb) == '':
+        return abs(na) <= tolerancia          # 0.0 vs vacío -> iguales
+    if nb is not None and _texto_norm(va) == '':
+        return abs(nb) <= tolerancia
+    # 3) Texto normalizado
     return _texto_norm(va) == _texto_norm(vb)
 
 
