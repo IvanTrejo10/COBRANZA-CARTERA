@@ -1,12 +1,16 @@
 # -*- coding: utf-8 -*-
 """Prueba funcional: datos sucios tipicos -> formato identico al BI."""
+import io
 import sys
+import zipfile
 from decimal import Decimal
 import pandas as pd
+from openpyxl import load_workbook
 
 sys.path.insert(0, '/root/trabajo')
 import datos_cobranza_latam as dl
 import datos_cobranza_presico as dp
+import procesos as pr
 
 ok = True
 def check(cond, msg):
@@ -99,6 +103,26 @@ check(r3b['Ruta'].tolist() == ['MANZANILLO', ' tecoman-r2 '], 'otros servidores:
 # ---------- redondeo opcional ----------
 r4 = dp.aplicar_formato_bi(pd.DataFrame({'pago_servicio': [10.005, '33.333']}), redondear=2)
 check(r4['pago_servicio'].tolist() == [10.0, 33.33] or r4['pago_servicio'].tolist() == [10.01, 33.33], 'redondear=2 opcional')
+
+# ---------- exportacion Excel: Grupo siempre como texto ----------
+print('excel_bytes Grupo como texto:')
+df_grupos = pd.DataFrame({
+    'Grupo': [119, 120.0, '00121', None],
+    'Monto': [10.0, 20.0, 30.0, 40.0],
+})
+excel_grupos = pr.excel_bytes(df_grupos)
+wb = load_workbook(io.BytesIO(excel_grupos), data_only=True)
+ws = wb['Hoja1']
+celdas_grupo = [ws.cell(row=fila, column=1) for fila in range(2, 6)]
+check([c.value for c in celdas_grupo] == ['119', '120', '00121', None],
+      'valores de Grupo conservados como texto, incluidos ceros a la izquierda')
+check(all(c.data_type == 's' and c.number_format == '@' for c in celdas_grupo[:3]),
+      'celdas no vacias de Grupo tienen tipo string y formato Texto (@)')
+check(celdas_grupo[3].number_format == '@', 'celdas vacias de Grupo conservan formato Texto (@)')
+with zipfile.ZipFile(io.BytesIO(excel_grupos)) as archivo_xlsx:
+    xml_hoja = archivo_xlsx.read('xl/worksheets/sheet1.xml').decode('utf-8')
+check('sqref="A2:A5"' in xml_hoja and 'numberStoredAsText="1"' in xml_hoja,
+      'Excel no muestra la advertencia de numero almacenado como texto en Grupo')
 
 # ---------- las variables originales siguen intactas ----------
 print('integridad del modulo:')

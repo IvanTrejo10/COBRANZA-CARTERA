@@ -401,10 +401,16 @@ with tab_cobranza:
 
         if proceso.startswith("🌅"):
             fechas_cobranza = [AYER.strftime("%Y-%m-%d"), HOY.strftime("%Y-%m-%d")]
+            prefijos_archivo = {
+                AYER.strftime("%Y-%m-%d"): "CIE",
+                HOY.strftime("%Y-%m-%d"): "APE",
+            }
         elif proceso.startswith("🌇"):
             fechas_cobranza = [HOY.strftime("%Y-%m-%d")]
+            prefijos_archivo = {HOY.strftime("%Y-%m-%d"): "PRE"}
         else:
             fechas_cobranza = [fecha_especifica_cob.strftime("%Y-%m-%d")] if fecha_especifica_cob else []
+            prefijos_archivo = {fecha: "COBRANZA" for fecha in fechas_cobranza}
 
         regiones_txt = ", ".join([r for r, ok in [("LATAM", correr_latam), ("PRESICO MX", correr_presico)] if ok]) or "ninguna región"
         st.info(f"Se generará el corte **{' y '.join(fechas_cobranza)}** para **{regiones_txt}**.")
@@ -428,6 +434,8 @@ with tab_cobranza:
                 s.update(label=f"💱 Tipo de Cambio cargado ({origen}): {len(df_tc)} países", state="complete")
 
         for fecha in fechas_cobranza:
+            prefijo_archivo = prefijos_archivo[fecha]
+            fecha_archivo = datetime.strptime(fecha, "%Y-%m-%d").strftime("%d-%m-%Y")
             if correr_latam:
                 with st.status(f"🌎 COBRANZA LATAM — corte {fecha}", expanded=True) as s:
                     barra = st.progress(0.0)
@@ -448,7 +456,7 @@ with tab_cobranza:
                                 "🕓 Cobranza c/ atraso": dinero(total["Cobranza_con_atrasoNW"]),
                                 "🧾 Pago c/ atraso": dinero(total["PAGO COBRANZA EN ATRASO"]),
                             },
-                            "archivo": f"COBRANZA LATAM {fecha}.xlsx",
+                            "archivo": f"{prefijo_archivo} LATAM {fecha_archivo}.xlsx",
                             "excel": pr.excel_bytes(df_final),
                         })
                         s.update(label=f"🌎 COBRANZA LATAM {fecha} — ✅ {len(df_final):,} registros", state="complete", expanded=False)
@@ -476,7 +484,7 @@ with tab_cobranza:
                                 "🕓 Cobranza c/ atraso": dinero(total["Cobranza con atraso"]),
                                 "🧾 Pago c/ atraso": dinero(total["Pago Cobranza con atraso"]),
                             },
-                            "archivo": f"COBRANZA PRESICO {fecha}.xlsx",
+                            "archivo": f"{prefijo_archivo} MX {fecha_archivo}.xlsx",
                             "excel": pr.excel_bytes(df_final),
                         })
                         s.update(label=f"🦅 COBRANZA PRESICO MX {fecha} — ✅ {len(df_final):,} registros", state="complete", expanded=False)

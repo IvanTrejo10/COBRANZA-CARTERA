@@ -9,6 +9,7 @@ import io
 import re
 import numpy as np
 import pandas as pd
+from xlsxwriter.utility import xl_range
 
 import datos_cobranza_latam as DL
 import datos_cobranza_presico as DP
@@ -464,11 +465,22 @@ def proceso_cartera_mexico(fecha, venta_cartera=None, usuario=None, contrasena=N
 # GENERACIÓN DE ARCHIVOS EN MEMORIA (para descargar desde la web)
 # ==========================================================
 def excel_bytes(df, hoja="Hoja1", columnas_fecha=None, columna_fecha_hora=None):
-    """Genera el .xlsx en memoria con el mismo estilo (Century Gothic 8, encabezado naranja)."""
+    """Genera el .xlsx en memoria con el mismo estilo (Century Gothic 8, encabezado naranja).
+
+    ``Grupo`` es un identificador y se exporta siempre como texto real de Excel,
+    aunque la base de datos entregue algunos valores como números.
+    """
     columnas_fecha = columnas_fecha or []
+    df_excel = df.copy()
+    columnas_texto = [col for col in ("Grupo",) if col in df_excel.columns]
+    for col in columnas_texto:
+        # El formateador LATAM conserva nulos y ceros a la izquierda de las
+        # cadenas, y elimina el sufijo ".0" cuando el origen entregó un float.
+        df_excel[col] = df_excel[col].map(DL._texto_bi)
+
     buf = io.BytesIO()
     with pd.ExcelWriter(buf, engine="xlsxwriter") as writer:
-        df.to_excel(writer, sheet_name=hoja, index=False)
+        df_excel.to_excel(writer, sheet_name=hoja, index=False)
         wb = writer.book
         ws = writer.sheets[hoja]
         wb.formats[0].set_font_name("Century Gothic")
@@ -480,8 +492,9 @@ def excel_bytes(df, hoja="Hoja1", columnas_fecha=None, columna_fecha_hora=None):
         })
         fmt_fecha = wb.add_format({"num_format": "dd/mm/yyyy", "font_name": "Century Gothic", "font_size": 8})
         fmt_fecha_hora = wb.add_format({"num_format": "dd/mm/yyyy hh:mm", "font_name": "Century Gothic", "font_size": 8})
-        muestra = df.head(200)
-        for i, col in enumerate(df.columns):
+        fmt_texto = wb.add_format({"num_format": "@", "font_name": "Century Gothic", "font_size": 8})
+        muestra = df_excel.head(200)
+        for i, col in enumerate(df_excel.columns):
             ws.write(0, i, str(col), fmt_encabezado)
             largos = [len(str(col))] + [len(str(v)) for v in muestra[col].tolist()]
             ancho = min(max(largos) + 2, 35)
@@ -489,6 +502,23 @@ def excel_bytes(df, hoja="Hoja1", columnas_fecha=None, columna_fecha_hora=None):
                 ws.set_column(i, i, ancho, fmt_fecha)
             elif columna_fecha_hora and col == columna_fecha_hora:
                 ws.set_column(i, i, ancho, fmt_fecha_hora)
+            elif col in columnas_texto:
+                ws.set_column(i, i, ancho, fmt_texto)
+                # Se reescriben las celdas para que el tipo interno sea string
+                # y el formato de cada celda sea Texto, no solo el de la columna.
+                for fila, valor in enumerate(df_excel[col], start=1):
+                    if valor is None or pd.isna(valor):
+                        ws.write_blank(fila, i, None, fmt_texto)
+                    else:
+                        ws.write_string(fila, i, valor, fmt_texto)
+                if len(df_excel):
+                    # Excel interpreta cadenas como "148" correctamente como
+                    # texto, pero por defecto muestra el aviso visual "número
+                    # almacenado como texto". Se conserva el tipo texto y solo
+                    # se desactiva esa advertencia para la columna Grupo.
+                    ws.ignore_errors({
+                        "number_stored_as_text": xl_range(1, i, len(df_excel), i)
+                    })
             else:
                 ws.set_column(i, i, ancho)
     return buf.getvalue()
