@@ -124,6 +124,19 @@ with zipfile.ZipFile(io.BytesIO(excel_grupos)) as archivo_xlsx:
 check('sqref="A2:A5"' in xml_hoja and 'numberStoredAsText="1"' in xml_hoja,
       'Excel no muestra la advertencia de numero almacenado como texto en Grupo')
 
+# ---------- rutas excluidas de cobranza PRESICO ----------
+print('filtrar rutas excluidas de cobranza PRESICO:')
+df_rutas = pd.DataFrame({
+    'Ruta': [
+        'TEPATITLAN-LL-R1', ' TALA-C-R1 ', 'zona de pruebas-p-r1',
+        'RUTA ACTIVA', None,
+    ],
+    'registro': [1, 2, 3, 4, 5],
+})
+rutas_filtradas = pr.filtrar_rutas_excluidas_presico(df_rutas)
+check(rutas_filtradas['registro'].tolist() == [4, 5],
+      'se quitan TEPATITLAN-LL-R1, TALA-C-R1 y ZONA DE PRUEBAS-P-R1')
+
 # ---------- las variables originales siguen intactas ----------
 print('integridad del modulo:')
 check(len(dl.RAW_QUERIES) == 10 and len(dp.RAW_QUERIES_PRESICO) == 7, 'RAW_QUERIES completos')

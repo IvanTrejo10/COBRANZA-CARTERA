@@ -184,6 +184,21 @@ def resumen_cobranza_latam(df_final):
 # ==========================================================
 # COBRANZA PRESICO MX (mismos pasos del flujo NV)
 # ==========================================================
+RUTAS_EXCLUIDAS_COBRANZA_PRESICO = frozenset({
+    "TEPATITLAN-LL-R1",
+    "TALA-C-R1",
+    "ZONA DE PRUEBAS-P-R1",
+})
+
+
+def filtrar_rutas_excluidas_presico(df):
+    """Quita rutas que no deben formar parte de la cobranza PRESICO."""
+    if "Ruta" not in df.columns:
+        return df.copy()
+    rutas_normalizadas = df["Ruta"].astype("string").str.strip().str.upper()
+    return df.loc[~rutas_normalizadas.isin(RUTAS_EXCLUIDAS_COBRANZA_PRESICO)].copy()
+
+
 def _extraer_cobranza_presico(servidor, fecha, usuario, contrasena):
     from sqlalchemy import text
     engine = _engine(servidor["host"], servidor["db"], usuario, contrasena)
@@ -213,6 +228,7 @@ def transformar_cobranza_presico(df, df_estructura, limpiar_ruta=False):
         df["Ruta"] = df["Ruta"].replace("MANZANILLO", "MANZANILLO-P-R2")
         df["Ruta"] = df["Ruta"].str.strip()
         df["Ruta"] = df["Ruta"].str.replace(r"[\x00-\x1F\x7F-\x9F]", "", regex=True)
+    df = filtrar_rutas_excluidas_presico(df)
     df = df.merge(
         df_estructura[["Ruta", "Territorio", "Subdireccion", "Zona ", "Sucursal", "Base"]],
         on="Ruta", how="left"
